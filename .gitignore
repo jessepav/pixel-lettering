@@ -1,2 +1,16 @@
 /pixel-lettering-font-sheets
 /reference
+
+GTAGS
+GRTAGS
+GPATH
+gtags.files
+tags
+*.tags
+
+logs/
+build/
+dist/
+local/
+
+Session*.vim
