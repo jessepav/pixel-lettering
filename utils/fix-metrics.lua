@@ -86,7 +86,7 @@ local function main()
             comment = false, sortkeys = sort_keys, indent = "    ",
         })
         f = io.open(out_fn, "wb")
-        f:write(encoded, "\n")
+        f:write("return ", encoded, "\n")
         f:close();
 
         print("Wrote " .. out_fn)
