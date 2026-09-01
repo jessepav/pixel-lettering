@@ -4,4 +4,4 @@ PROJDIR=$(realpath $(dirname "$0")/..)
 
 cd $PROJDIR
 
-fd -g '*.lua' > gtags.files
+fd -e lua -e c -E 'samples/**' > gtags.files
