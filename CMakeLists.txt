@@ -23,47 +23,31 @@ if(WIN32)
         message(FATAL_ERROR "On Windows, set -DLUA_INCLUDE_DIR=<path to lua.h> and -DLUA_LIBRARY=<path to the Lua import/static library>")
     endif()
     set(LUA_INCLUDE_DIRS "${LUA_INCLUDE_DIR}")
-
-    # Likewise for libgd: point us at its headers and import library directly.
-    set(GD_INCLUDE_DIR "" CACHE PATH "Path to the directory containing gd.h")
-    set(GD_LIBRARY "" CACHE FILEPATH "Path to the libgd import library (e.g. gd.lib / libgd.dll.a)")
-    if(NOT GD_INCLUDE_DIR OR NOT GD_LIBRARY)
-        message(FATAL_ERROR "On Windows, set -DGD_INCLUDE_DIR=<path to gd.h> and -DGD_LIBRARY=<path to the libgd import library>")
-    endif()
-    set(GD_INCLUDE_DIRS "${GD_INCLUDE_DIR}")
-    set(GD_LIBRARIES "${GD_LIBRARY}")
-    set(GD_LIBRARY_DIRS "")
 else()
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(LUA REQUIRED lua5.3)
-    pkg_check_modules(GD  REQUIRED gdlib)
 endif()
 
-add_library(wrap_gdlib MODULE src/wrap_gdlib.c)
+# stb is vendored as headers compiled straight into the module, so there is no
+# image library to find here and none to resolve at runtime.
+add_library(wrap_stb_image MODULE src/wrap_stb_image.c)
 
-target_include_directories(wrap_gdlib PRIVATE ${LUA_INCLUDE_DIRS} ${GD_INCLUDE_DIRS})
-target_link_directories(wrap_gdlib    PRIVATE ${GD_LIBRARY_DIRS})
+target_include_directories(wrap_stb_image PRIVATE ${LUA_INCLUDE_DIRS})
 
-target_link_libraries(wrap_gdlib PRIVATE ${GD_LIBRARIES})
+# SYSTEM so that -Wall -Wextra stays pointed at our own source: stb trips
+# -Wunused-function and -Wmaybe-uninitialized, and there is nothing to fix in a
+# vendored header.
+target_include_directories(wrap_stb_image SYSTEM PRIVATE lib)
 
 if(WIN32)
     # Windows DLL linkers require the Lua symbols to be resolved at link time.
-    target_link_libraries(wrap_gdlib PRIVATE "${LUA_LIBRARY}")
-    target_compile_definitions(wrap_gdlib PRIVATE WRAP_GDLIB_BUILD_DLL)
+    target_link_libraries(wrap_stb_image PRIVATE "${LUA_LIBRARY}")
+    target_compile_definitions(wrap_stb_image PRIVATE WRAP_STB_IMAGE_BUILD_DLL)
 endif()
 
-# require() wants wrap_gdlib.so on POSIX and wrap_gdlib.dll on Windows
-set_target_properties(wrap_gdlib PROPERTIES
+# require() wants wrap_stb_image.so on POSIX and wrap_stb_image.dll on Windows
+set_target_properties(wrap_stb_image PROPERTIES
     PREFIX ""
     SUFFIX "${CMAKE_SHARED_MODULE_SUFFIX}"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
-
-if(NOT WIN32)
-    # ldconfig resolves libgd.so.3 to the distro's 2.3.0 in /usr/lib, so pin the
-    # pkg-config libdir or we load the wrong libgd at runtime. Windows has no
-    # RPATH equivalent; DLL search order is handled via PATH instead.
-    set_target_properties(wrap_gdlib PROPERTIES
-        BUILD_RPATH   "${GD_LIBRARY_DIRS}"
-        INSTALL_RPATH "${GD_LIBRARY_DIRS}")
-endif()

@@ -1,6 +1,6 @@
 #!/usr/bin/env lua5.3
 
-local gdlib = require "gdlib"
+local img = require "stb_image"
 
 local STYLES = { "regular", "bold", "italic" }
 local MARKER = { ["**"] = "bold", ["*"] = "italic", ["_"] = "italic" }
@@ -36,7 +36,7 @@ local function load_font (base, fdef)
         index[g.chr] = g
     end
 
-    return { image    = gdlib.load(resolve(base, fdef.sheet)),
+    return { image    = img.load(resolve(base, fdef.sheet)),
              metrics  = metrics,
              index    = index,
              notdef   = metrics.glyphs[1],
@@ -317,13 +317,13 @@ local function render (lines, width, vm, gap, sheets, pad, bg)
     local text_h = n * vm.line_height + (n - 1) * gap
     local w, h = width + 2 * pad, math.max(1, text_h + 2 * pad)
 
-    -- spelled out rather than `bg and gdlib.parse_color(bg)`, which would
+    -- spelled out rather than `bg and img.parse_color(bg)`, which would
     -- truncate the three returns to one and leave create() without its g and b
     local canvas
     if bg then
-        canvas = gdlib.create(w, h, gdlib.parse_color(bg))
+        canvas = img.create(w, h, img.parse_color(bg))
     else
-        canvas = gdlib.create(w, h)
+        canvas = img.create(w, h)
     end
 
     for i, line in ipairs(lines) do
@@ -351,7 +351,7 @@ local function do_passage (passage, base, fonts, vm, warned)
         if f then
             -- a font's color is only a default; the passage overrides it, the
             -- same way it overrides line_gap
-            sheets[f] = sheet_for(f, gdlib.parse_color(passage.color or f.color))
+            sheets[f] = sheet_for(f, img.parse_color(passage.color or f.color))
         end
     end
 
@@ -367,7 +367,7 @@ local function do_passage (passage, base, fonts, vm, warned)
 
     local resolved_fn = resolve(base, passage.filename)
     print(string.format("Writing: %s", resolved_fn))
-    gdlib.write_png(im, resolved_fn)
+    img.write_png(im, resolved_fn)
 end
 
 local function main ()

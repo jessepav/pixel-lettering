@@ -1,4 +1,4 @@
-local C = require "wrap_gdlib"
+local C = require "wrap_stb_image"
 
 -- anything not defined here falls through to the c module, so adding a binding
 -- needs no edit on this side
