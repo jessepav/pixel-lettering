@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.16)
 project(pixel-lettering C)
 
+# Default single-configuration generators to an optimized build, while still
+# allowing callers to override it with -DCMAKE_BUILD_TYPE=<type>.
+if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release RelWithDebInfo MinSizeRel)
+endif()
+
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
