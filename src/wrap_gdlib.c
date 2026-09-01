@@ -12,6 +12,16 @@
 #include <lua.h>
 #include <lauxlib.h>
 
+#if defined(_WIN32)
+#  if defined(WRAP_GDLIB_BUILD_DLL)
+#    define WRAP_GDLIB_API __declspec(dllexport)
+#  else
+#    define WRAP_GDLIB_API __declspec(dllimport)
+#  endif
+#else
+#  define WRAP_GDLIB_API
+#endif
+
 #define IMAGE_MT "gd.image"
 
 /* im == NULL means explicitly destroyed, so __gc after destroy() is harmless */
@@ -290,7 +300,7 @@ static const luaL_Reg module_funcs[] = {
     { NULL, NULL }
 };
 
-int luaopen_wrap_gdlib (lua_State *L)
+WRAP_GDLIB_API int luaopen_wrap_gdlib (lua_State *L)
 {
     /* the metatable has to be complete -- __gc included -- before any userdata
        gets it, or lua 5.3 never marks the object for finalization. */

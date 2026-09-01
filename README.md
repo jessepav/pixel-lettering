@@ -16,7 +16,8 @@ Windows:
 ```bat
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release ^
       -DLUA_INCLUDE_DIR=C:/path/to/lua/include ^
+      -DLUA_LIBRARY=C:/path/to/lua/lib/lua53.lib ^
       -DGD_INCLUDE_DIR=C:/path/to/gd/include ^
-      -DGD_LIBRARY=C:/path/to/gd/lib/gd.lib ^
-      ...
+      -DGD_LIBRARY=C:/path/to/gd/lib/gd.lib
+cmake --build build --config Release
 ```

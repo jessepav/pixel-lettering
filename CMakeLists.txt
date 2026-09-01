@@ -9,11 +9,11 @@ endif()
 
 if(WIN32)
     # pkg-config's .pc files generally aren't available on Windows, so require
-    # the invoker to point us at a Lua build directly. Its library isn't linked
-    # (see the comment above target_link_libraries below), only its headers.
+    # the invoker to point us at a Lua build directly.
     set(LUA_INCLUDE_DIR "" CACHE PATH "Path to the directory containing lua.h")
-    if(NOT LUA_INCLUDE_DIR)
-        message(FATAL_ERROR "On Windows, set -DLUA_INCLUDE_DIR=<path to lua.h>")
+    set(LUA_LIBRARY "" CACHE FILEPATH "Path to the Lua import/static library (e.g. lua53.lib / liblua5.3.a)")
+    if(NOT LUA_INCLUDE_DIR OR NOT LUA_LIBRARY)
+        message(FATAL_ERROR "On Windows, set -DLUA_INCLUDE_DIR=<path to lua.h> and -DLUA_LIBRARY=<path to the Lua import/static library>")
     endif()
     set(LUA_INCLUDE_DIRS "${LUA_INCLUDE_DIR}")
 
@@ -37,10 +37,13 @@ add_library(wrap_gdlib MODULE src/wrap_gdlib.c)
 target_include_directories(wrap_gdlib PRIVATE ${LUA_INCLUDE_DIRS} ${GD_INCLUDE_DIRS})
 target_link_directories(wrap_gdlib    PRIVATE ${GD_LIBRARY_DIRS})
 
-# gd only.  ${LUA_LIBRARIES} is deliberately unused: a loadable module leaves the
-# lua_* symbols undefined for the host interpreter to resolve, so don't link them
-# and don't add -Wl,--no-undefined.
 target_link_libraries(wrap_gdlib PRIVATE ${GD_LIBRARIES})
+
+if(WIN32)
+    # Windows DLL linkers require the Lua symbols to be resolved at link time.
+    target_link_libraries(wrap_gdlib PRIVATE "${LUA_LIBRARY}")
+    target_compile_definitions(wrap_gdlib PRIVATE WRAP_GDLIB_BUILD_DLL)
+endif()
 
 # require() wants wrap_gdlib.so on POSIX and wrap_gdlib.dll on Windows
 set_target_properties(wrap_gdlib PROPERTIES
