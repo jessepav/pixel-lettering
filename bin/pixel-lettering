@@ -2,7 +2,7 @@
 # no cd: a definition file path resolves against the caller's cwd, and
 # everything named inside it against the definition file's own directory
 
-PROJDIR=$(realpath "$(dirname "$0")/..")
+PROJDIR=$(realpath "$(dirname "$(realpath "$0")")/..")
 
 # lua 5.3 consults the versioned names before the plain ones, so set both.
 # prepend rather than replace, or an existing luarocks tree stops resolving; the
