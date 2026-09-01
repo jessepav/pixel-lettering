@@ -365,7 +365,9 @@ local function do_passage (passage, base, fonts, vm, warned)
                       passage.padding or 0, passage.bgcolor)
     if passage.scale and passage.scale > 1 then im = im:scale(passage.scale) end
 
-    gdlib.write_png(im, resolve(base, passage.filename))
+    local resolved_fn = resolve(base, passage.filename)
+    print(string.format("Writing: %s", resolved_fn))
+    gdlib.write_png(im, resolved_fn)
 end
 
 local function main ()
