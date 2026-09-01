@@ -6,18 +6,21 @@ return {
              sheet   = "../pixel-lettering-font-sheets/summit/summit_bold.png",
              line_gap = 5 },
     italic = { metrics = "../pixel-lettering-font-sheets/summit/summit_italic-metrics.lua",
-             sheet   = "../pixel-lettering-font-sheets/summit/summit_italic.png" },
+               sheet   = "../pixel-lettering-font-sheets/summit/summit_italic.png",
+               color   = "#3333FF" },
   },
 
   passages = {
     {
       width = 400,
       filename = "passage1.png",
+      scale = 2,
       text = [[
         Passage text is written in a small subset of Markdown. The only 
         supported formatting is *word* or _word_ for italic, and **word**
-        for bold. A backslash before * or _ removes its special meaning,
-        and may be used to insert the literal character.
+        for bold. A backslash before *, _, or another backslash removes
+        its special meaning, and may be used to insert the \_literal\_
+        \*characters\*. Two backslashes, \\\\, yield a single \\.
 
         A blank line, as above, separates paragraphs (i.e. represents two
         newlines in the output).
@@ -35,9 +38,10 @@ return {
     {
       width = 400,
       filename = "passage2.png",
-      scale = 2,
+      scale = 1,
+      color = { 0x12, 0xFF, 0x12 },
       text = [[
-        Another passage.
+        Another passage. What happens if text is *italic* here?
       ]]
     }
   }

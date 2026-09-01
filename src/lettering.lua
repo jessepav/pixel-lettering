@@ -103,8 +103,15 @@ local function preprocess (text)
 
     -- must come before lone newlines turn into spaces: the rule above already
     -- ate the surrounding spaces, so a surviving \<newline> would collapse to
-    -- backslash-space and the break would be lost
-    t = t:gsub("\\\n", BREAK)
+    -- backslash-space and the break would be lost.
+    --
+    -- only an odd-length run breaks the line -- the leading pairs are escaped
+    -- backslashes, and the odd one out is what escapes the newline.  parity is
+    -- why this can't just be a "\\\n" pattern.
+    t = t:gsub("(\\*)\n", function (run)
+        if #run % 2 == 0 then return run .. "\n" end
+        return run:sub(1, -2) .. BREAK
+    end)
 
     t = t:gsub("\n+", function (nl)
         return #nl == 1 and " " or BREAK .. BREAK   -- 2+ means a blank line
@@ -123,7 +130,7 @@ local function scan_delims (s)
     while i <= #s do
         local c = s:sub(i, i)
 
-        if c == "\\" and s:sub(i + 1, i + 1):match("^[%*_]") then
+        if c == "\\" and s:sub(i + 1, i + 1):match("^[%*_\\]") then
             i = i + 2                       -- escaped, so not a delimiter at all
         elseif c == "*" or c == "_" then
             local run = s:match(c == "*" and "^%*+" or "^_+", i)
@@ -181,7 +188,9 @@ local function parse_inline (s)
         local c = s:sub(i, i)
         local d = span[i]
 
-        if c == "\\" and s:sub(i + 1, i + 1):match("^[%*_]") then
+        if c == "\\" and s:sub(i + 1, i + 1):match("^[%*_\\]") then
+            -- a backslash is only special before * _ or another backslash, so a
+            -- stray one (a windows path, say) still prints as itself
             atoms[#atoms + 1] = { c = s:sub(i + 1, i + 1), st = style() }
             i = i + 2
         elseif d then
