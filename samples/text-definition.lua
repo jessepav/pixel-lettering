@@ -17,6 +17,7 @@ return {
       scale = 2,
       bgcolor = "#eeeeee",  -- if not given, background will be transparent
       padding = 5,  -- pixels padding on all sides,
+      align = "left",  -- "left" (default), "center", or "right"
       text = [[
         Passage text is written in a small subset of Markdown. The only 
         supported formatting is *word* or _word_ for italic, and **word**

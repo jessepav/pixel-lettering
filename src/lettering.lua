@@ -5,6 +5,9 @@ local img = require "stb_image"
 local STYLES = { "regular", "bold", "italic" }
 local MARKER = { ["**"] = "bold", ["*"] = "italic", ["_"] = "italic" }
 
+-- the share of a line's leftover space that goes in front of it
+local ALIGN = { left = 0, center = 0.5, right = 1 }
+
 -- line-break sentinel.  safe because no sheet has a glyph below 0x21.
 local BREAK = "\1"
 local BLANK = "[%s" .. BREAK .. "]"
@@ -312,7 +315,9 @@ end
 -- padding is additive: the text still wraps to `width`, and the canvas grows by
 -- `pad` on every side.  bg is nil for a transparent background, otherwise the
 -- r, g, b the whole canvas -- padding included -- is filled with.
-local function render (lines, width, vm, gap, sheets, pad, bg)
+--
+-- share is the ALIGN fraction of a line's leftover space to put on its left.
+local function render (lines, width, vm, gap, sheets, pad, bg, share)
     local n = #lines
     local text_h = n * vm.line_height + (n - 1) * gap
     local w, h = width + 2 * pad, math.max(1, text_h + 2 * pad)
@@ -329,13 +334,17 @@ local function render (lines, width, vm, gap, sheets, pad, bg)
     for i, line in ipairs(lines) do
         local top = (i - 1) * (vm.line_height + gap)
 
+        -- an over-wide line (one unbreakable word) has nothing to distribute,
+        -- and the max keeps it from being pulled left off the canvas
+        local dx = math.floor(math.max(0, width - line.w) * share)
+
         for _, pl in ipairs(line.p) do
             local g, f = pl.gg.g, pl.gg.f
             local m = f.metrics
 
             -- ascent - baseline puts each glyph's own baseline row on the
             -- line's shared baseline, whatever font it came from
-            canvas:copy(sheets[f], pad + pl.x,
+            canvas:copy(sheets[f], pad + dx + pl.x,
                         pad + top + vm.ascent - m.baseline,
                         g.tile_x, g.tile_y, m.tile_w, m.tile_h)
         end
@@ -361,8 +370,14 @@ local function do_passage (passage, base, fonts, vm, warned)
     -- used exactly as given; only the font-level gaps went through the max
     local gap = passage.line_gap or vm.font_gap
 
+    local share = ALIGN[passage.align or "left"]
+    if not share then
+        error(("bad align %q: expected left, center, or right")
+              :format(tostring(passage.align)), 0)
+    end
+
     local im = render(lines, passage.width, vm, gap, sheets,
-                      passage.padding or 0, passage.bgcolor)
+                      passage.padding or 0, passage.bgcolor, share)
     if passage.scale and passage.scale > 1 then im = im:scale(passage.scale) end
 
     local resolved_fn = resolve(base, passage.filename)
