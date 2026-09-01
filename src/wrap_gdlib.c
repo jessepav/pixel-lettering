@@ -50,24 +50,35 @@ static void finish_new (gdImagePtr im)
     gdImageSaveAlpha(im, 1);
 }
 
+/* create(w, h) clears to transparent; create(w, h, r, g, b) clears to that
+ * color, fully opaque.
+ */
 static int l_create (lua_State *L)
 {
     int w = (int) luaL_checkinteger(L, 1);
     int h = (int) luaL_checkinteger(L, 2);
+    int fill = gdTrueColorAlpha(0, 0, 0, gdAlphaTransparent);
     gdImagePtr im;
 
     luaL_argcheck(L, w >= 1, 1, "width must be >= 1");
     luaL_argcheck(L, h >= 1, 2, "height must be >= 1");
 
+    if (!lua_isnoneornil(L, 3)) {
+        int r = check_byte(L, 3);
+        int g = check_byte(L, 4);
+        int b = check_byte(L, 5);
+        fill = gdTrueColorAlpha(r, g, b, gdAlphaOpaque);
+    }
+
     im = gdImageCreateTrueColor(w, h);
     if (!im) return luaL_error(L, "cannot create a %dx%d image", w, h);
 
     /* the rows are calloc'd, i.e. opaque black, so the clear is mandatory -- and
-       it only works with blending off, since gdAlphaBlend returns dst untouched
-       for a fully transparent source, making the fill a no-op. */
+       a transparent clear only works with blending off, since gdAlphaBlend
+       returns dst untouched for a fully transparent source, making the fill a
+       no-op. */
     gdImageAlphaBlending(im, gdEffectReplace);
-    gdImageFilledRectangle(im, 0, 0, w - 1, h - 1,
-                           gdTrueColorAlpha(0, 0, 0, gdAlphaTransparent));
+    gdImageFilledRectangle(im, 0, 0, w - 1, h - 1, fill);
     finish_new(im);
 
     push_image(L, im);

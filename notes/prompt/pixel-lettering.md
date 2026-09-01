@@ -17,21 +17,33 @@ it overrides the `line_gap` field in the font metrics file, described below. A
 font definition may also carry a `color` field, which supplies the color for
 that font unless the passage specifies one of its own.
 
-The `passages` array contains tables defining individual output files. The width
-of the resulting image is given by the `width` field, in pixels. Text should be
-wrapped to this width. The height of the resulting image is determined by the
-rendering of the passage text. The format of passage text is described in
+The `passages` array contains tables defining individual output files. The
+`width` field, in pixels, gives the width of the text column; text is wrapped to
+it. The height of the resulting image is determined by the rendering of the
+passage text. The format of passage text is described in
 @samples/text-definition.lua itself. The `filename` indicates the name of the
 PNG file to which to write the rendered image. If `scale` is given, it is an
 integer >= 1 indicating the factor by which the resulting image should be scaled
 (using a simple nearest neighbor algorithm) before being written. Thus the width
-of the resulting PNG file will be `width * scale`.
+of the resulting PNG file will be `(width + 2 * padding) * scale`.
 
 A passage may also specify `color`, either as `"#rrggbb"` (or `"#rgb"`) or as a
 table `{r, g, b}`. The glyph sheets are masks, so the color supplies the RGB and
 the sheet supplies the alpha. A passage's `color` overrides the `color` of every
 font it uses; a font-level `color` therefore acts as a default for passages that
 don't set one. Absent both, text is black.
+
+A passage may specify `bgcolor`, in the same forms `color` accepts. Given one,
+the image is filled with that color, fully opaque, instead of being left
+transparent; the text is then drawn over it. Absent it, the background is
+transparent.
+
+A passage may specify `padding`, a number of pixels added on all four sides of
+the rendered text. It is additive rather than an inset: text still wraps to
+`width`, and the image becomes `width + 2 * padding` wide and
+`2 * padding` taller than the text. The padding takes the background, so it is
+transparent unless `bgcolor` is set. Padding is applied before `scale`, so it
+scales along with everything else.
 
 A passage may specify `line_gap`, which is used exactly as given and overrides
 every font's gap for that passage. It may be negative, to pull lines closer

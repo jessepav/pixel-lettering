@@ -309,10 +309,22 @@ end
 -- Output
 --------------------------------------------------------------------------------
 
-local function render (lines, width, vm, gap, sheets)
+-- padding is additive: the text still wraps to `width`, and the canvas grows by
+-- `pad` on every side.  bg is nil for a transparent background, otherwise the
+-- r, g, b the whole canvas -- padding included -- is filled with.
+local function render (lines, width, vm, gap, sheets, pad, bg)
     local n = #lines
-    local height = math.max(1, n * vm.line_height + (n - 1) * gap)
-    local canvas = gdlib.create(width, height)
+    local text_h = n * vm.line_height + (n - 1) * gap
+    local w, h = width + 2 * pad, math.max(1, text_h + 2 * pad)
+
+    -- spelled out rather than `bg and gdlib.parse_color(bg)`, which would
+    -- truncate the three returns to one and leave create() without its g and b
+    local canvas
+    if bg then
+        canvas = gdlib.create(w, h, gdlib.parse_color(bg))
+    else
+        canvas = gdlib.create(w, h)
+    end
 
     for i, line in ipairs(lines) do
         local top = (i - 1) * (vm.line_height + gap)
@@ -323,7 +335,8 @@ local function render (lines, width, vm, gap, sheets)
 
             -- ascent - baseline puts each glyph's own baseline row on the
             -- line's shared baseline, whatever font it came from
-            canvas:copy(sheets[f], pl.x, top + vm.ascent - m.baseline,
+            canvas:copy(sheets[f], pad + pl.x,
+                        pad + top + vm.ascent - m.baseline,
                         g.tile_x, g.tile_y, m.tile_w, m.tile_h)
         end
     end
@@ -348,7 +361,8 @@ local function do_passage (passage, base, fonts, vm, warned)
     -- used exactly as given; only the font-level gaps went through the max
     local gap = passage.line_gap or vm.font_gap
 
-    local im = render(lines, passage.width, vm, gap, sheets)
+    local im = render(lines, passage.width, vm, gap, sheets,
+                      passage.padding or 0, passage.bgcolor)
     if passage.scale and passage.scale > 1 then im = im:scale(passage.scale) end
 
     gdlib.write_png(im, resolve(base, passage.filename))
