@@ -15,3 +15,5 @@ dist/
 local/
 
 Session*.vim
+
+/windows-libs

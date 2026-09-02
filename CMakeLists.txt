@@ -15,14 +15,31 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 if(WIN32)
-    # pkg-config's .pc files generally aren't available on Windows, so require
-    # the invoker to point us at a Lua build directly.
-    set(LUA_INCLUDE_DIR "" CACHE PATH "Path to the directory containing lua.h")
-    set(LUA_LIBRARY "" CACHE FILEPATH "Path to the Lua import/static library (e.g. lua53.lib / liblua5.3.a)")
-    if(NOT LUA_INCLUDE_DIR OR NOT LUA_LIBRARY)
-        message(FATAL_ERROR "On Windows, set -DLUA_INCLUDE_DIR=<path to lua.h> and -DLUA_LIBRARY=<path to the Lua import/static library>")
+    # pkg-config's .pc files generally aren't available on Windows, so we build
+    # against the private Lua tree in windows-libs/ instead. It is a vcpkg
+    # lua:x64-windows-release install and is gitignored, so a fresh clone has to
+    # recreate it -- see the README.
+    #
+    # That triplet ships release binaries only. Prefer a Release build; with a
+    # multi-config generator that means `cmake --build build --config Release`.
+    set(WINDOWS_LIBS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/windows-libs")
+    set(LUA_INCLUDE_DIRS "${WINDOWS_LIBS_DIR}/include")
+    set(LUA_LIBRARY "${WINDOWS_LIBS_DIR}/lib/lua.lib")
+    set(LUA_RUNTIME_DLL "${WINDOWS_LIBS_DIR}/bin/lua.dll")
+
+    if(NOT EXISTS "${LUA_INCLUDE_DIRS}/lua.h" OR NOT EXISTS "${LUA_LIBRARY}")
+        message(FATAL_ERROR
+            "No Lua found in ${WINDOWS_LIBS_DIR}. Populate it with a vcpkg "
+            "lua:x64-windows-release install (see README.md).")
     endif()
-    set(LUA_INCLUDE_DIRS "${LUA_INCLUDE_DIR}")
+
+    # x64-windows-release is 64-bit; a 32-bit generator would otherwise fail at
+    # link time with a less obvious message.
+    if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+        message(FATAL_ERROR
+            "windows-libs holds 64-bit Lua; configure a 64-bit generator "
+            "(e.g. -A x64).")
+    endif()
 else()
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(LUA REQUIRED lua5.3)
@@ -51,3 +68,14 @@ set_target_properties(wrap_stb_image PROPERTIES
     SUFFIX "${CMAKE_SHARED_MODULE_SUFFIX}"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+
+if(WIN32)
+    # lua.lib is an import library, so wrap_stb_image.dll pulls in lua.dll at
+    # load time. Lua 5.3 loads C modules with LOAD_WITH_ALTERED_SEARCH_PATH,
+    # which searches the module's own directory, so a copy alongside it
+    # satisfies the import wherever the build output lands.
+    add_custom_command(TARGET wrap_stb_image POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${LUA_RUNTIME_DLL}" "$<TARGET_FILE_DIR:wrap_stb_image>"
+        COMMENT "Staging lua.dll next to wrap_stb_image")
+endif()

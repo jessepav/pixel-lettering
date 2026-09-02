@@ -30,5 +30,15 @@ rem the user's repl helpers, and should not die when they fail to load.
 set "LUA_INIT="
 set "LUA_INIT_5_3="
 
-lua "%PROJDIR%\src\lettering.lua" %*
+rem The interpreter must be the one in windows-libs: wrap_stb_image.dll
+rem imports from that same lua.dll, and a differently-linked lua.exe off PATH
+rem would leave the process with a second Lua state. Bail rather than fall back.
+set "LUA_EXE=%PROJDIR%\windows-libs\tools\lua\lua.exe"
+if not exist "%LUA_EXE%" (
+    >&2 echo pixel-lettering: no Lua interpreter at "%LUA_EXE%"
+    >&2 echo pixel-lettering: populate windows-libs -- see README.md
+    exit /b 1
+)
+
+"%LUA_EXE%" "%PROJDIR%\src\lettering.lua" %*
 exit /b %ERRORLEVEL%
