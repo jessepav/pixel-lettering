@@ -1,4 +1,19 @@
 return {
+  -- with a config.onefile table, the passage filenames below are ignored and
+  -- every passage image instead becomes a row of one image, written here.  the
+  -- rows are as wide as the widest of them, each placed according to its own
+  -- `align`, and `margin` pixels separate the rows and surround the whole
+  -- image.  that surround is transparent unless `bgcolor` is given, which fills
+  -- it (and any space beside a narrower row) instead.  remove this table to get
+  -- one file per passage again.
+  config = {
+    onefile = {
+      filename = "joined.png",
+      margin = 20,
+      -- bgcolor = "#000",
+    }
+  },
+
   fonts = {
     regular = { metrics = "../pixel-lettering-font-sheets/summit/summit-metrics.lua",
                 sheet   = "../pixel-lettering-font-sheets/summit/summit.png" },
@@ -45,6 +60,35 @@ return {
       color = { 0x12, 0xFF, 0x12 },
       text = [[
         Another passage. What happens if text is *italic* here?
+      ]]
+    },
+    {
+      width = 600,
+      -- filename = "earthbound.png",
+      scale = 1,
+      bgcolor = "#000000",
+      color = "#FFF",
+      padding = 20,
+      text = [[
+I started investigating Earthbound in earnest after completing Undertale and finding
+great inspiration in its simple aesthetic, contemplative mood, melancholy music, and
+quirky humor---basically, its artistic vision. I thought of it as a game of a type that I
+could indeed create.
+
+Toby Fox was a huge Earthbound fan in his youth:
+
+*"EarthBound dominated my childhold (sic), shaped my preteen years, and played a large role
+in molding me into the offbeat pseudohippie I am today. It gave me a sense of humor. It
+helped me learn how to read. Its lessons served as a basis for my sense of justice and
+courage."*
+
+This quote was taken from a retrospective of his prominent ROM-hack ("Radiation's
+Halloween Hack").
+
+From the above page, I see that his ROM hack was a **serious** project: he created
+assets, planned and wrote the story, and drew on significant previous experience with
+ROM-editing tools to hack everything together. Writing that Earthbound hack prepared him
+for Undertale.
       ]]
     }
   }

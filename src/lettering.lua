@@ -322,9 +322,18 @@ end
 -- Output
 --------------------------------------------------------------------------------
 
+-- bg is nil for a transparent canvas, otherwise anything parse_color takes.
+--
+-- spelled out rather than `bg and img.parse_color(bg)`, which would truncate
+-- the three returns to one and leave create() without its g and b
+local function canvas_for (w, h, bg)
+    if bg then return img.create(w, h, img.parse_color(bg)) end
+    return img.create(w, h)
+end
+
 -- padding is additive: the text still wraps to `width`, and the canvas grows by
--- `pad` on every side.  bg is nil for a transparent background, otherwise the
--- r, g, b the whole canvas -- padding included -- is filled with.
+-- `pad` on every side.  bg fills the whole canvas, padding included, before any
+-- glyph lands on it.
 --
 -- share is the ALIGN fraction of a line's leftover space to put on its left.
 local function render (lines, width, vm, gap, sheets, pad, bg, share)
@@ -332,14 +341,7 @@ local function render (lines, width, vm, gap, sheets, pad, bg, share)
     local text_h = n * vm.line_height + (n - 1) * gap
     local w, h = width + 2 * pad, math.max(1, text_h + 2 * pad)
 
-    -- spelled out rather than `bg and img.parse_color(bg)`, which would
-    -- truncate the three returns to one and leave create() without its g and b
-    local canvas
-    if bg then
-        canvas = img.create(w, h, img.parse_color(bg))
-    else
-        canvas = img.create(w, h)
-    end
+    local canvas = canvas_for(w, h, bg)
 
     for i, line in ipairs(lines) do
         local top = (i - 1) * (vm.line_height + gap)
@@ -363,7 +365,39 @@ local function render (lines, width, vm, gap, sheets, pad, bg, share)
     return canvas
 end
 
-local function do_passage (passage, base, fonts, vm, warned)
+-- the margin surrounds the joined canvas as well as separating its rows, so no
+-- passage image ever touches an edge: n images take n + 1 vertical gaps, plus
+-- one on each side.
+local function join (queued, margin, bg)
+    local width, height = 0, (#queued + 1) * margin
+
+    for _, q in ipairs(queued) do
+        local w, h = q.im:size()
+        width = math.max(width, w)
+        height = height + h
+    end
+
+    -- filling the whole canvas is enough: the rows cover everything except the
+    -- margins and the space beside an image narrower than the widest one
+    local canvas = canvas_for(width + 2 * margin, height, bg)
+    local top = margin
+
+    for _, q in ipairs(queued) do
+        local w, h = q.im:size()
+
+        -- each image sits where its own `align` puts it, so a centered passage
+        -- stays centered in the joined column rather than only within its own
+        -- narrower image
+        local dx = margin + math.floor((width - w) * q.share)
+
+        canvas:copy(q.im, dx, top, 0, 0, w, h)
+        top = top + h + margin
+    end
+
+    return canvas
+end
+
+local function render_passage (passage, base, fonts, vm, warned)
     local sheets = {}
     for _, style in ipairs(STYLES) do
         local f = fonts[style]
@@ -390,9 +424,37 @@ local function do_passage (passage, base, fonts, vm, warned)
                       passage.padding or 0, passage.bgcolor, share)
     if passage.scale and passage.scale > 1 then im = im:scale(passage.scale) end
 
-    local resolved_fn = resolve(base, passage.filename)
-    print(string.format("Writing: %s", resolved_fn))
-    img.write_png(im, resolved_fn)
+    -- share comes back out because join needs it too, and by here the align
+    -- name has already been validated
+    return im, share
+end
+
+local function write_image (im, path)
+    print(string.format("Writing: %s", path))
+    img.write_png(im, path)
+end
+
+-- both fields are required whenever onefile is given: neither a filename nor a
+-- margin has a defensible default, and a typo like `margins = 20` that quietly
+-- fell back to per-passage files would be easy to miss.
+local function onefile_config (def)
+    local one = def.config and def.config.onefile
+    if not one then return nil end
+
+    if type(one.filename) ~= "string" then
+        error("config.onefile needs a filename", 0)
+    end
+    if type(one.margin) ~= "number" or one.margin < 0 then
+        error("config.onefile needs a margin (a pixel count, 0 or more)", 0)
+    end
+
+    -- parsed here purely to reject a bad color now rather than after every
+    -- passage has been laid out
+    if one.bgcolor then img.parse_color(one.bgcolor) end
+
+    return { filename = one.filename,
+             margin   = math.floor(one.margin),
+             bgcolor  = one.bgcolor }
 end
 
 local function main ()
@@ -404,12 +466,35 @@ local function main ()
     for _, path in ipairs(arg) do
         local base = dirname(path)
         local def = dofile(path)
+
+        -- checked before any rendering, so a bad config fails at once instead
+        -- of after every passage has been laid out
+        local one = onefile_config(def)
+
         local fonts = load_fonts(base, def.fonts)
         local vm = vertical_metrics(fonts)
         local warned = {}   -- one table per run, so each miss warns just once
+        local queued = {}
 
         for _, passage in ipairs(def.passages) do
-            do_passage(passage, base, fonts, vm, warned)
+            local im, share = render_passage(passage, base, fonts, vm, warned)
+
+            if one then
+                queued[#queued + 1] = { im = im, share = share }
+            elseif type(passage.filename) == "string" then
+                write_image(im, resolve(base, passage.filename))
+            else
+                -- only onefile makes a passage filename optional
+                error("passage has no filename, and config.onefile is not set", 0)
+            end
+        end
+
+        if one then
+            if #queued == 0 then
+                error("config.onefile is set, but there are no passages", 0)
+            end
+            write_image(join(queued, one.margin, one.bgcolor),
+                        resolve(base, one.filename))
         end
     end
 end
