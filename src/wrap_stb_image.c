@@ -26,6 +26,7 @@
 #define STBI_ONLY_PNG               /* the sheets are pngs, as they were under gd */
 #define STBI_NO_LINEAR
 #define STBI_NO_HDR
+#define STBI_WINDOWS_UTF8           /* use _wfopen with utf-8 paths on windows */
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
 
@@ -33,7 +34,7 @@
 #define STBIW_REALLOC(p, sz)    realloc(p, sz)
 #define STBIW_FREE(p)           free(p)
 
-#define STBI_WRITE_NO_STDIO         /* encoded bytes go to lua, never to a FILE* */
+#define STBIW_WINDOWS_UTF8          /* use _wfopen with utf-8 paths on windows */
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb/stb_image_write.h"
 
@@ -266,6 +267,7 @@ static int l_scale (lua_State *L)
     Image *src = check_image(L, 1);
     int f = (int) luaL_checkinteger(L, 2);
     Image *dst;
+    size_t row_bytes;
     int y, x, dy, dx;
 
     luaL_argcheck(L, f >= 1, 2, "factor must be >= 1");
@@ -273,18 +275,24 @@ static int l_scale (lua_State *L)
                   "factor too large for this image");
 
     dst = new_image(L, src->w * f, src->h * f);
+    row_bytes = (size_t) dst->w * 4;
 
-    for (y = 0; y < src->h; y++)
+    for (y = 0; y < src->h; y++) {
+        const unsigned char *srow = src->px + (size_t) y * src->w * 4;
+        unsigned char *row0 = dst->px + (size_t) y * f * row_bytes;
+
         for (x = 0; x < src->w; x++) {
-            const unsigned char *sp = src->px + ((size_t) y * src->w + x) * 4;
+            const unsigned char *sp = srow + (size_t) x * 4;
+            unsigned char *dp = row0 + (size_t) x * f * 4;
 
-            for (dy = 0; dy < f; dy++) {
-                unsigned char *dp = dst->px
-                    + ((size_t) (y * f + dy) * dst->w + (size_t) x * f) * 4;
-
-                for (dx = 0; dx < f; dx++, dp += 4) memcpy(dp, sp, 4);
-            }
+            for (dx = 0; dx < f; dx++, dp += 4) memcpy(dp, sp, 4);
         }
+
+        for (dy = 1; dy < f; dy++) {
+            unsigned char *row = row0 + (size_t) dy * row_bytes;
+            memcpy(row, row0, row_bytes);
+        }
+    }
     return 1;
 }
 
@@ -309,6 +317,24 @@ static int l_png_string (lua_State *L)
     lua_pushlstring(L, (const char *) png, (size_t) len);
     STBIW_FREE(png);
     return 1;
+}
+
+static int l_write_png (lua_State *L)
+{
+    Image *im = check_image(L, 1);
+    const char *fn = luaL_checkstring(L, 2);
+    int level = (int) luaL_optinteger(L, 3, -1);
+    int saved = stbi_write_png_compression_level;
+    int ok;
+
+    luaL_argcheck(L, level >= -1 && level <= 9, 3, "level must be -1..9");
+
+    if (level >= 0) stbi_write_png_compression_level = level;
+    ok = stbi_write_png(fn, im->w, im->h, 4, im->px, im->w * 4);
+    stbi_write_png_compression_level = saved;
+
+    if (!ok) return luaL_error(L, "cannot write '%s'", fn);
+    return 0;
 }
 
 static int l_get_pixel (lua_State *L)
@@ -355,6 +381,7 @@ static const luaL_Reg image_methods[] = {
     { "recolor",    l_recolor    },
     { "scale",      l_scale      },
     { "png_string", l_png_string },
+    { "write_png",  l_write_png  },
     { "get_pixel",  l_get_pixel  },
     { "destroy",    l_destroy    },
     { NULL, NULL }
@@ -368,6 +395,7 @@ static const luaL_Reg module_funcs[] = {
     { "recolor",    l_recolor    },
     { "scale",      l_scale      },
     { "png_string", l_png_string },
+    { "write_png",  l_write_png  },
     { "get_pixel",  l_get_pixel  },
     { "destroy",    l_destroy    },
     { NULL, NULL }
