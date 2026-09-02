@@ -16,12 +16,22 @@ local BLANK = "[%s" .. BREAK .. "]"
 -- Paths -- everything in a definition file is relative to the file itself
 --------------------------------------------------------------------------------
 
+-- both separators count: on windows the definition path arrives with
+-- backslashes from tab completion or a drag-drop, and treating one as an
+-- ordinary character silently reduces the whole path to a dirname of ".".
+-- the join always emits "/", which the windows file APIs take as well.
 local function dirname (path)
-    return path:match("^(.*)/[^/]*$") or "."
+    return path:match("^(.*)[/\\][^/\\]*$") or "."
+end
+
+-- a leading separator, or a drive letter -- "C:" as a base is already the
+-- drive's root once the join appends its "/", so no special case is needed
+local function is_absolute (path)
+    return path:match("^[/\\]") ~= nil or path:match("^%a:") ~= nil
 end
 
 local function resolve (base, path)
-    if path:sub(1, 1) == "/" then return path end
+    if is_absolute(path) then return path end
     return base .. "/" .. path
 end
 
