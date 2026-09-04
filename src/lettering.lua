@@ -457,45 +457,89 @@ local function onefile_config (def)
              bgcolor  = one.bgcolor }
 end
 
+-- the definition splits across files by role: the first argument is always the
+-- one read for `config` and `fonts`, and every later one is read for nothing
+-- but its `passages`.  each file keeps its own base directory, so a path names
+-- what it would name if that file were the only argument.
+--
+-- with a lone argument the roles collapse onto it, which is the original
+-- single-file form.  a `passages` in a config file that isn't alone is ignored,
+-- as are `config` and `fonts` in a passages file.
+local function load_sources (paths)
+    local cfg_base = dirname(paths[1])
+    local def = dofile(paths[1])
+
+    if type(def) ~= "table" then
+        error(("%s does not return a table"):format(paths[1]), 0)
+    end
+    if type(def.fonts) ~= "table" then
+        -- the likely cause with two files is the arguments the other way round
+        error(("%s defines no fonts"):format(paths[1]), 0)
+    end
+
+    local sources = {}
+
+    if #paths == 1 then
+        if type(def.passages) ~= "table" then
+            error(("%s defines no passages"):format(paths[1]), 0)
+        end
+        sources[1] = { base = cfg_base, passages = def.passages }
+    else
+        for i = 2, #paths do
+            local pdef = dofile(paths[i])
+            if type(pdef) ~= "table" or type(pdef.passages) ~= "table" then
+                error(("%s defines no passages"):format(paths[i]), 0)
+            end
+            sources[#sources + 1] = { base    = dirname(paths[i]),
+                                      passages = pdef.passages }
+        end
+    end
+
+    return def, cfg_base, sources
+end
+
 local function main ()
     if #arg == 0 then
-        io.stderr:write("usage: lettering DEFINITION.lua ...\n")
+        io.stderr:write("usage: lettering DEFINITION.lua [PASSAGES.lua ...]\n")
         os.exit(1)
     end
 
-    for _, path in ipairs(arg) do
-        local base = dirname(path)
-        local def = dofile(path)
+    local def, cfg_base, sources = load_sources(arg)
 
-        -- checked before any rendering, so a bad config fails at once instead
-        -- of after every passage has been laid out
-        local one = onefile_config(def)
+    -- checked before any rendering, so a bad config fails at once instead of
+    -- after every passage has been laid out
+    local one = onefile_config(def)
 
-        local fonts = load_fonts(base, def.fonts)
-        local vm = vertical_metrics(fonts)
-        local warned = {}   -- one table per run, so each miss warns just once
-        local queued = {}
+    local fonts = load_fonts(cfg_base, def.fonts)
+    local vm = vertical_metrics(fonts)
+    local warned = {}   -- one table per run, so each miss warns just once
+    local queued = {}
 
-        for _, passage in ipairs(def.passages) do
-            local im, share = render_passage(passage, base, fonts, vm, warned)
+    for _, src in ipairs(sources) do
+        for _, passage in ipairs(src.passages) do
+            local im, share = render_passage(passage, src.base, fonts, vm, warned)
 
             if one then
+                -- one queue for every passages file, not one apiece: there is a
+                -- single onefile filename, so several joined images would only
+                -- overwrite each other
                 queued[#queued + 1] = { im = im, share = share }
             elseif type(passage.filename) == "string" then
-                write_image(im, resolve(base, passage.filename))
+                write_image(im, resolve(src.base, passage.filename))
             else
                 -- only onefile makes a passage filename optional
                 error("passage has no filename, and config.onefile is not set", 0)
             end
         end
+    end
 
-        if one then
-            if #queued == 0 then
-                error("config.onefile is set, but there are no passages", 0)
-            end
-            write_image(join(queued, one.margin, one.bgcolor),
-                        resolve(base, one.filename))
+    if one then
+        if #queued == 0 then
+            error("config.onefile is set, but there are no passages", 0)
         end
+        -- the filename came from the config file, so it resolves there
+        write_image(join(queued, one.margin, one.bgcolor),
+                    resolve(cfg_base, one.filename))
     end
 end
 
